@@ -1,5 +1,7 @@
 add_executable(fallinc
   main.c
+  console.c
+  console_term.c
 )
 
 set_target_properties(fallinc PROPERTIES
