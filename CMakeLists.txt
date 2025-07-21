@@ -10,3 +10,6 @@ project(fallinc
 )
 
 add_subdirectory(src)
+if (WASM)
+  add_subdirectory(web)
+endif()

@@ -1,6 +1,6 @@
 #include "console.h"
 
-int main(void) {
+static void fal_main(void) {
   struct fal_console console = {};
   fal_console_init(&console);
   fal_console_clear(&console,
@@ -14,6 +14,18 @@ int main(void) {
   fal_console_render(console.content);
 
   fal_console_deinit(&console);
+}
 
+#ifdef FAL_WASM
+#include "js.h"
+int wasm_main(void) {
+  js_log("Startup");
+  fal_main();
   return 0;
 }
+#else
+int main(void) {
+  fal_main();
+  return 0;
+}
+#endif // FAL_WASM
