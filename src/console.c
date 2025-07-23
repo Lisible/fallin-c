@@ -4,7 +4,7 @@
 
 void fal_console_init(struct fal_console *console) {
   console->current_bg_col = FAL_COLOR_BLACK;
-  console->current_fg_col = FAL_COLOR_WHITE;
+  console->current_text_color = FAL_COLOR_WHITE;
   console->cursor_pos.x = 0;
   console->cursor_pos.y = 0;
   fal_console_clear(console, NULL);
@@ -23,7 +23,7 @@ void fal_console_clear(struct fal_console *console,
   for (int y = 0; y < FAL_CONSOLE_HEIGHT; y++) {
     for (int x = 0; x < FAL_CONSOLE_WIDTH; x++) {
       console->content[y][x].bg = console->current_bg_col;
-      console->content[y][x].fg = console->current_fg_col;
+      console->content[y][x].fg = console->current_text_color;
       console->content[y][x].character = ' ';
     }
   }
@@ -49,7 +49,7 @@ void fal_console_write_at(struct fal_console *console, struct fal_position pos,
         &console->content[console->cursor_pos.y][console->cursor_pos.x];
     console_char->character = text[i];
     console_char->bg = console->current_bg_col;
-    console_char->fg = console->current_fg_col;
+    console_char->fg = console->current_text_color;
 
     console->cursor_pos.x++;
     if (console->cursor_pos.x >= FAL_CONSOLE_WIDTH) {
@@ -58,25 +58,50 @@ void fal_console_write_at(struct fal_console *console, struct fal_position pos,
     }
   }
 }
-void fal_console_draw_rect(struct fal_console *console, struct fal_position tl,
-                           struct fal_position br) {
+void fal_console_set_text_color(struct fal_console *console, fal_color text) {
+  console->current_text_color = text;
+}
+void fal_console_set_bg_color(struct fal_console *console, fal_color bg) {
+
+  console->current_bg_col = bg;
+}
+void fal_console_set_colors(struct fal_console *console, fal_color bg,
+                            fal_color text) {
+  fal_console_set_bg_color(console, bg);
+  fal_console_set_text_color(console, text);
+}
+void fal_console_draw_frame(struct fal_console *console,
+                            const struct fal_console_frame_infos *frame_infos) {
+  struct fal_position tl = frame_infos->top_left;
+  struct fal_position br = frame_infos->bottom_right;
+  fal_console_set_colors(console, frame_infos->background_color,
+                         frame_infos->text_color);
+
   if (br.x < tl.x || br.y < tl.y) {
     return;
   }
 
+  struct fal_console_char(*content)[FAL_CONSOLE_HEIGHT][FAL_CONSOLE_WIDTH] =
+      &console->content;
+
   for (int y = tl.y; y <= br.y; y++) {
     for (int x = tl.x; x <= br.x; x++) {
-      console->content[y][x].bg = console->current_bg_col;
-      console->content[y][x].fg = console->current_fg_col;
+      (*content)[y][x].bg = console->current_bg_col;
+      (*content)[y][x].fg = console->current_text_color;
+
+      char c;
       if ((x == tl.x && y == tl.y) || (x == br.x && y == tl.y) ||
           (x == tl.x && y == br.y) || (x == br.x && y == br.y)) {
-        console->content[y][x].character = '+';
+        c = frame_infos->border_type == FAL_FRAME_BORDER_SINGLE ? '+' : '#';
+        (*content)[y][x].character = c;
       } else if (x == tl.x || x == br.x) {
-        console->content[y][x].character = '|';
+        c = frame_infos->border_type == FAL_FRAME_BORDER_SINGLE ? '|' : '#';
+        (*content)[y][x].character = c;
       } else if (y == tl.y || y == br.y) {
-        console->content[y][x].character = '-';
+        c = frame_infos->border_type == FAL_FRAME_BORDER_SINGLE ? '-' : '=';
+        (*content)[y][x].character = c;
       } else {
-        console->content[y][x].character = ' ';
+        (*content)[y][x].character = ' ';
       }
     }
   }

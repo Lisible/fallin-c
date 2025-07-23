@@ -47,7 +47,7 @@ struct fal_console {
   struct fal_console_char content[FAL_CONSOLE_HEIGHT][FAL_CONSOLE_WIDTH];
   struct fal_position cursor_pos;
   fal_color current_bg_col;
-  fal_color current_fg_col;
+  fal_color current_text_color;
 };
 void fal_console_init(struct fal_console *console);
 void fal_console_deinit(struct fal_console *console);
@@ -59,8 +59,25 @@ void fal_console_move_x(struct fal_console *console, int xrel);
 void fal_console_move_y(struct fal_console *console, int yrel);
 void fal_console_write_at(struct fal_console *console, struct fal_position pos,
                           const char *text);
-void fal_console_draw_rect(struct fal_console *console, struct fal_position tl,
-                           struct fal_position br);
+void fal_console_set_text_color(struct fal_console *console, fal_color text);
+void fal_console_set_bg_color(struct fal_console *console, fal_color bg);
+void fal_console_set_colors(struct fal_console *console, fal_color bg,
+                            fal_color text);
+
+enum fal_frame_border_type {
+  FAL_FRAME_BORDER_SINGLE,
+  FAL_FRAME_BORDER_DOUBLE,
+};
+
+struct fal_console_frame_infos {
+  struct fal_position top_left;
+  struct fal_position bottom_right;
+  enum fal_frame_border_type border_type;
+  fal_color text_color;
+  fal_color background_color;
+};
+void fal_console_draw_frame(struct fal_console *console,
+                            const struct fal_console_frame_infos *frame_infos);
 
 void fal_console_render_init(void);
 void fal_console_render_deinit(void);
