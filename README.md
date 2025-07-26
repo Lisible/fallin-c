@@ -1,4 +1,4 @@
-# fallin-c
+# fallinc
 
 A C re-implementation of a first year students text RPG game engine. Originally
 made by [@sliya](https://github.com/sliya), [@metzg](https://github.com/metzg)
