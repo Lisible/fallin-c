@@ -1,5 +1,7 @@
 set(fallinc_srcs
   main.c
+  engine.c
+  jbb.c
 )
 
 if (WASM)
