@@ -1,6 +1,7 @@
 set(fallinc_srcs
   main.c
   engine.c
+  console.c
   jbb.c
 )
 

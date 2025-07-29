@@ -123,6 +123,7 @@ void fal_console_write_at(fal_console *console, int x, int y,
   int cur_y = y;
   size_t text_length = strlen(text);
   for (int i = 0; i < text_length; i++) {
+    printf("\033[%d;%dm", console->background_color + 10, console->text_color);
     printf("%c", text[i]);
     if (cur_x >= FAL_CONSOLE_WIDTH - 1) {
       cur_x = 0;

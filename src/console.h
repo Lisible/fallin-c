@@ -43,4 +43,8 @@ void fal_console_draw_frame(fal_console *console, int x1, int y1, int x2,
 
 void fal_console_write_at(fal_console *console, int x, int y, const char *text);
 
+void fal_console_ui_display_illustration(fal_console *console,
+                                         const char illustration[][80],
+                                         int height, int offset);
+
 #endif // FAL_CONSOLE_H

@@ -1,7 +1,10 @@
+// #include "console.h"
 #include "engine.h"
+#include "platform.h"
 
 int main(void) {
   struct fal_engine *engine = fal_engine_create();
+  fal_engine_start(engine);
   fal_engine_destroy(engine);
   // fal_console *console = fal_console_create();
   // fal_console_set_background_color(console, FAL_COLOR_BLUE);
@@ -19,7 +22,7 @@ int main(void) {
   //                        FAL_COLOR_RED, FAL_COLOR_RED);
   // fal_console_destroy(console);
 
-  // while (fal_platform_read_key() != 27)
-  //   ;
+  while (fal_platform_read_key() != 27)
+    ;
   return 0;
 }
