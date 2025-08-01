@@ -30,6 +30,7 @@ enum fal_color {
 typedef struct fal_console fal_console;
 fal_console *fal_console_create(void);
 void fal_console_destroy(fal_console *console);
+void fal_console_read_line(fal_console *console, char *buf, int buf_cap);
 
 void fal_console_set_text_color(fal_console *console, enum fal_color color);
 void fal_console_set_background_color(fal_console *console,
@@ -68,6 +69,11 @@ void fal_console_ui_display_interface(fal_console *console,
                                       const char content[][80],
                                       int content_size, bool input_line);
 void fal_console_ui_display_notice_pop(fal_console *console,
-                                       const char *content);
+                                       const char *content, ...);
+
+struct fal_action;
+int fal_console_ui_display_pop(fal_console *console, const char *message,
+                               struct fal_action *actions, int action_count,
+                               char actions_to_run[][32]);
 
 #endif // FAL_CONSOLE_H

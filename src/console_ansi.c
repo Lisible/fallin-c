@@ -49,6 +49,26 @@ void fal_console_destroy(fal_console *console) {
   free(console);
 }
 
+void fal_console_read_line(fal_console *console, char *buf, int buf_cap) {
+  fflush(stdout);
+
+  char c;
+  int index = 0;
+  while (1) {
+    read(STDIN_FILENO, &c, 1);
+    if (c == '\n') {
+      break;
+    } else {
+      if (index < buf_cap - 1) {
+        buf[index++] = c;
+        putchar(c);
+        fflush(stdout);
+      }
+    }
+  }
+  buf[index] = '\0';
+}
+
 void fal_console_set_text_color(fal_console *console, enum fal_color color) {
   console->text_color = color;
 }

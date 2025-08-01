@@ -3,22 +3,19 @@
 #include "jbb.h"
 #include "panic.h"
 #include "platform.h"
+#include "str.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define FAL_ID_MAX_LENGTH 64
-#define FAL_NAME_MAX_LENGTH 64
 #define FAL_DESCRIPTION_MAX_LENGTH 64
 #define FAL_ILLUSTRATION_WIDTH 80
 #define FAL_ILLUSTRATION_HEIGHT 10
 
-#define FAL_ACTION_MAX_LENGTH 1024
-#define FAL_TRIGGER_ACTION_MAX_COUNT 32
 struct fal_trigger {
   char id[FAL_ID_MAX_LENGTH];
-  char actions[FAL_ACTION_MAX_LENGTH][FAL_TRIGGER_ACTION_MAX_COUNT];
+  char actions[FAL_ACTION_MAX_LENGTH][FAL_ACTION_MAX_COUNT];
   int action_count;
 };
 
@@ -47,17 +44,16 @@ struct fal_npc {
   int bought_item_type_count;
 };
 
-#define FAL_LOCATION_ACTION_MAX_COUNT 16
 struct fal_location {
   char id[FAL_ID_MAX_LENGTH];
   char name[FAL_NAME_MAX_LENGTH];
   char description_day[FAL_DESCRIPTION_MAX_LENGTH];
   char description_night[FAL_DESCRIPTION_MAX_LENGTH];
   char illustration[FAL_ILLUSTRATION_WIDTH][FAL_ILLUSTRATION_HEIGHT];
-  char actions[FAL_ACTION_MAX_LENGTH][FAL_LOCATION_ACTION_MAX_COUNT];
+  char actions[FAL_ACTION_MAX_LENGTH][FAL_ACTION_MAX_COUNT];
   int action_count;
   char origin_map[FAL_ID_MAX_LENGTH];
-  char origin_actions[FAL_ACTION_MAX_LENGTH][FAL_LOCATION_ACTION_MAX_COUNT];
+  char origin_actions[FAL_ACTION_MAX_LENGTH][FAL_ACTION_MAX_COUNT];
   int origin_action_count;
 };
 
@@ -93,6 +89,55 @@ struct fal_item {
   int action_count;
 };
 
+struct fal_inventory_cell {
+  char item_id[FAL_ID_MAX_LENGTH];
+  int quantity;
+  struct fal_inventory_cell *next;
+  struct fal_inventory_cell *previous;
+};
+
+#define FAL_PLAYER_NAME_MAX_LENGTH 30
+#define FAL_PLAYER_CHOICES_CAPACITY 64
+#define FAL_PLAYER_MAX_HP 100
+#define FAL_PLAYER_SPEED 100
+#define FAL_PLAYER_STRENGTH 1
+#define FAL_PLAYER_HUNGER 100
+#define FAL_PLAYER_HUNGER_LOSS_PER_HOUR 1
+// Level of hunger below which player starts to lose HP
+#define FAL_PLAYER_HUNGER_FLOOR 30
+#define FAL_PLAYER_HP_LOSS_HUNGRY 1
+struct fal_player {
+  char name[FAL_PLAYER_NAME_MAX_LENGTH];
+  char location[FAL_ID_MAX_LENGTH];
+  int hp;
+  int max_hp;
+  int speed;
+  int strength;
+  int time;
+  int hunger;
+  int money;
+  char tool[FAL_ID_MAX_LENGTH];
+  char armor[FAL_ID_MAX_LENGTH];
+  struct fal_action choices[FAL_PLAYER_CHOICES_CAPACITY];
+  int choice_count;
+  struct fal_inventory_cell *inventory;
+};
+
+void fal_player_init(struct fal_player *player, const char *name) {
+  strcpy(player->name, name);
+  strcpy(player->location, "universe");
+  player->hp = FAL_PLAYER_MAX_HP;
+  player->max_hp = FAL_PLAYER_MAX_HP;
+  player->speed = FAL_PLAYER_SPEED;
+  player->strength = FAL_PLAYER_STRENGTH;
+  player->hunger = FAL_PLAYER_HUNGER;
+  player->inventory = NULL;
+  player->time = 12;
+  player->money = 0;
+  strcpy(player->armor, "");
+  strcpy(player->tool, "");
+}
+
 #define FAL_ENGINE_MAX_ITEM_COUNT 128
 #define FAL_ENGINE_MAX_TRIGGER_COUNT 128
 #define FAL_ENGINE_MAX_MOB_COUNT 128
@@ -104,6 +149,7 @@ struct fal_engine {
   struct fal_npc npcs[FAL_ENGINE_MAX_NPC_COUNT];
   struct fal_trigger triggers[FAL_ENGINE_MAX_TRIGGER_COUNT];
   struct fal_location locations[FAL_ENGINE_MAX_LOCATION_COUNT];
+  struct fal_player player;
   fal_console *console;
   int item_count;
   int trigger_count;
@@ -112,9 +158,221 @@ struct fal_engine {
   int location_count;
 };
 
+#define DECL_FIND_BY_ID_FNS(T, name)                                           \
+  static T *find_##name(T *array, int count,                                   \
+                        const char id[FAL_ID_MAX_LENGTH]) {                    \
+    for (int i = 0; i < count; i++) {                                          \
+      if (strcmp(array[i].id, id) == 0) {                                      \
+        return &array[i];                                                      \
+      }                                                                        \
+    }                                                                          \
+    return NULL;                                                               \
+  }
+
+DECL_FIND_BY_ID_FNS(struct fal_location, location)
+DECL_FIND_BY_ID_FNS(struct fal_item, item)
+DECL_FIND_BY_ID_FNS(struct fal_npc, npc)
+
+static const char *get_season(struct fal_engine *engine) {
+  int time = engine->player.time;
+  if (time % (28 * 24) < 7 * 24) {
+    return "Spring";
+  } else if (time % (28 * 24) < 14 * 24) {
+    return "Summer";
+  } else if (time % (28 * 24) < 21 * 24) {
+    return "Fall";
+  } else {
+    return "Winter";
+  }
+}
+
+static void
+execute_actions(struct fal_engine *engine,
+                const char actions[FAL_ACTION_MAX_LENGTH][FAL_ACTION_MAX_COUNT],
+                int action_count);
+
+static void action_goto(struct fal_engine *engine, char *map_id, int duration) {
+  struct fal_player *player = &engine->player;
+  strcpy(player->location, map_id);
+  player->time += duration;
+  if (strcmp(get_season(engine), "Winter") == 0) {
+    player->time += duration; // double the snow, double the fun!
+  }
+  player->choice_count = 0;
+}
+
+static struct fal_inventory_cell *
+find_inventory_cell(struct fal_inventory_cell **inventory,
+                    const char *item_id) {
+  if (*inventory == NULL) {
+    return NULL;
+  }
+
+  struct fal_inventory_cell *cell = *inventory;
+  while (strcmp(cell->item_id, item_id) != 0 && cell != NULL) {
+    cell = cell->next;
+  }
+
+  return cell;
+}
+
+static void add_item_to_inventory(struct fal_inventory_cell **inventory,
+                                  char item_id[FAL_ID_MAX_LENGTH],
+                                  int quantity) {
+  struct fal_inventory_cell *cell = find_inventory_cell(inventory, item_id);
+  if (cell) {
+    cell->quantity += quantity;
+  } else {
+    struct fal_inventory_cell *new_cell =
+        malloc(sizeof(struct fal_inventoy_cell *));
+    strcpy(new_cell->item_id, item_id);
+    new_cell->quantity = quantity;
+    if (*inventory == NULL) {
+      new_cell->next = NULL;
+      new_cell->previous = NULL;
+      *inventory = new_cell;
+    } else {
+      new_cell->next = *inventory;
+      new_cell->previous = NULL;
+      (*inventory)->previous = new_cell;
+      *inventory = new_cell;
+    }
+  }
+}
+
+static void action_harvest(struct fal_engine *engine, char *item_id,
+                           int quantity, int duration) {
+  struct fal_item *harvested_item =
+      find_item(engine->items, engine->item_count, item_id);
+  struct fal_player *player = &engine->player;
+  int final_quantity = 0;
+  if (strlen(player->tool) > 0) {
+    struct fal_item *tool_item =
+        find_item(engine->items, engine->item_count, player->tool);
+    if (strcmp(tool_item->category, "tool") == 0) {
+      final_quantity = tool_item->loot_modifier + quantity;
+    }
+  } else {
+    final_quantity = quantity;
+  }
+  player->time += duration;
+  add_item_to_inventory(&player->inventory, item_id, final_quantity);
+  fal_console_ui_display_notice_pop(engine->console, "You harvested %dx %s.",
+                                    final_quantity, harvested_item->name);
+}
+
+#define FAL_NPC_MESSAGE_BUFFER_CAPACITY                                        \
+  (FAL_NAME_MAX_LENGTH + FAL_DESCRIPTION_MAX_LENGTH + 4)
+static void action_trade(struct fal_engine *engine,
+                         const char npc_id[FAL_ID_MAX_LENGTH]) {
+  struct fal_npc *npc = find_npc(engine->npcs, engine->npc_count, npc_id);
+  char message[FAL_NPC_MESSAGE_BUFFER_CAPACITY] = {0};
+  snprintf(message, FAL_NPC_MESSAGE_BUFFER_CAPACITY, "%s: \\%s", npc->name,
+           npc->greetings);
+
+  char splits[1000][80] = {};
+  int split_count = fal_split_displayed_text(message, '\\', splits);
+  fal_console_ui_display_interface(
+      engine->console, FAL_UI_POSITION_DESCRIPTION_BOX, FAL_BORDER_SINGLE,
+      splits, split_count, false);
+
+  static const char *PROMPT_MESSAGE = "What do you want to do?";
+
+  struct fal_action buy_action = {.name = "Buy", .key = "b"};
+  sprintf(buy_action.actions[0], "buy %s", npc_id);
+  buy_action.action_count = 1;
+
+  struct fal_action sell_action = {.name = "Sell", .key = "s"};
+  sprintf(sell_action.actions[0], "sell%s", npc_id);
+  sell_action.action_count = 1;
+
+  struct fal_action cancel_action = {.name = "Cancel", .key = "a"};
+
+  struct fal_action actions[] = {buy_action, sell_action, cancel_action};
+
+  char actions_to_run[FAL_ACTION_MAX_LENGTH][FAL_ACTION_MAX_COUNT];
+  int action_to_run_count = fal_console_ui_display_pop(
+      engine->console, PROMPT_MESSAGE, actions,
+      sizeof(actions) / sizeof(actions[0]), actions_to_run);
+  execute_actions(engine, actions_to_run, action_to_run_count);
+}
+
+static void
+execute_actions(struct fal_engine *engine,
+                const char actions[FAL_ACTION_MAX_LENGTH][FAL_ACTION_MAX_COUNT],
+                int action_count) {
+  for (int i = 0; i < action_count; i++) {
+    char current_action[FAL_ACTION_MAX_LENGTH];
+    strcpy(current_action, actions[i]);
+    char *action = strtok(current_action, " ");
+    if (strcmp(action, "goto") == 0) {
+      char *map_id = strtok(NULL, " ");
+      char *duration_str = strtok(NULL, " ");
+      int duration = (int)strtol(duration_str, NULL, 10);
+      action_goto(engine, map_id, duration);
+    } else if (strcmp(action, "harvest") == 0) {
+      char *item_id = strtok(NULL, " ");
+      char *quantity_str = strtok(NULL, " ");
+      char *duration_str = strtok(NULL, " ");
+      int quantity = strtol(quantity_str, NULL, 10);
+      int duration = strtol(duration_str, NULL, 10);
+      action_harvest(engine, item_id, quantity, duration);
+    } else if (strcmp(action, "trade") == 0) {
+      char *npc_id = strtok(NULL, " ");
+      action_trade(engine, npc_id);
+    } else if (strcmp(action, "buy") == 0) {
+      // TODO
+    } else if (strcmp(action, "sell") == 0) {
+      // TODO
+    } else if (strcmp(action, "time") == 0) {
+      // TODO
+    } else if (strcmp(action, "set") == 0) {
+      // TODO
+    } else if (strcmp(action, "relset") == 0) {
+      // TODO
+    } else if (strcmp(action, "wear") == 0) {
+      // TODO
+    } else if (strcmp(action, "equip") == 0) {
+      // TODO
+    } else if (strcmp(action, "use") == 0) {
+      // TODO
+    } else if ((strcmp(action, "spawn") == 0) ||
+               (strcmp(action, "spoon") == 0)) {
+      // TODO
+    } else if (strcmp(action, "trigger") == 0) {
+      // TODO
+    } else if (strcmp(action, "give") == 0) {
+      // TODO
+    } else if (strcmp(action, "remove") == 0) {
+      // TODO
+    } else if (strcmp(action, "container") == 0) {
+      // TODO
+    } else if (strcmp(action, "transfert") == 0) {
+      // TODO
+    } else if (strcmp(action, "craft") == 0) {
+      // TODO
+    } else if (strcmp(action, "addchoice") == 0) {
+      // TODO
+    } else if (strcmp(action, "pop") == 0) {
+      // TODO
+    } else if (strcmp(action, "addpopchoice") == 0) {
+      // TODO
+    } else if (strcmp(action, "clearpopchoice") == 0) {
+      // TODO
+    } else if (strcmp(action, "askpop") == 0) {
+      // TODO
+    } else if (strcmp(action, "prob") == 0) {
+      // TODO
+    } else if (strcmp(action, "if") == 0) {
+      // TODO
+    } else if (strcmp(action, "%") != 0 && strcmp(action, "") != 0) {
+      // TODO
+    }
+  }
+}
+
 #define LOAD_ITEMS_PATH_BUF_CAPACITY 4096
 #define LOAD_ITEMS_LINE_BUF_CAPACITY 1024
-
 static bool parse_item(FILE *file, char *line_buf, int line_buf_cap,
                        struct fal_item *item) {
   while (strcmp(line_buf, ":endItem") != 0) {
@@ -210,7 +468,7 @@ static bool parse_trigger(FILE *file, char *line_buf, int line_buf_cap,
       while (strcmp(line_buf, ":endActions") != 0) {
         fal_jbb_read_line(file, line_buf, line_buf_cap);
 
-        if (trigger->action_count >= FAL_TRIGGER_ACTION_MAX_COUNT) {
+        if (trigger->action_count >= FAL_ACTION_MAX_COUNT) {
           goto err;
         }
 
@@ -322,7 +580,7 @@ static bool parse_location(FILE *file, char *line_buf, int line_buf_cap,
       while (strcmp(line_buf, ":endOriginActions") != 0) {
         fal_jbb_read_line(file, line_buf, line_buf_cap);
 
-        if (location->origin_action_count >= FAL_LOCATION_ACTION_MAX_COUNT) {
+        if (location->origin_action_count >= FAL_ACTION_MAX_COUNT) {
           goto err;
         }
 
@@ -338,7 +596,7 @@ static bool parse_location(FILE *file, char *line_buf, int line_buf_cap,
       while (strcmp(line_buf, ":endActions") != 0) {
         fal_jbb_read_line(file, line_buf, line_buf_cap);
 
-        if (location->action_count >= FAL_LOCATION_ACTION_MAX_COUNT) {
+        if (location->action_count >= FAL_ACTION_MAX_COUNT) {
           goto err;
         }
 
@@ -358,7 +616,7 @@ static bool parse_location(FILE *file, char *line_buf, int line_buf_cap,
 
     if (strlen(location->origin_map) > 0) {
       for (int i = 0; i < location->origin_action_count; i++) {
-        if (location->action_count >= FAL_LOCATION_ACTION_MAX_COUNT) {
+        if (location->action_count >= FAL_ACTION_MAX_COUNT) {
           goto err;
         }
         strcpy(location->actions[location->action_count++],
@@ -403,6 +661,7 @@ err:
     if (ferror(file)) {                                                        \
       goto close_file;                                                         \
     }                                                                          \
+    *asset_count = asset_index;                                                \
     fclose(file);                                                              \
     return true;                                                               \
   close_file:                                                                  \
@@ -494,6 +753,52 @@ static void display_main_menu(struct fal_engine *engine) {
       sizeof(MAIN_MENU_CONTENT) / sizeof(MAIN_MENU_CONTENT[0]), false);
 }
 
+#define FAL_MAX(a, b) ((a) > (b) ? (a) : (b))
+static void main_loop(struct fal_engine *engine) {
+  struct fal_player *player = &engine->player;
+  int time_of_last_action = player->time;
+  bool quit = false;
+  enum fal_key choice;
+  while (player->hp > 0 && choice != FAL_KEY_ESCAPE && choice != FAL_KEY_Q &&
+         !quit) {
+    if (player->time > time_of_last_action) {
+      player->hunger =
+          FAL_MAX(player->hunger - (player->time - time_of_last_action) *
+                                       FAL_PLAYER_HUNGER_LOSS_PER_HOUR,
+                  0);
+    }
+
+    if (player->hunger < FAL_PLAYER_HUNGER_FLOOR) {
+      player->hp = FAL_MAX(player->hp - (player->time - time_of_last_action) *
+                                            FAL_PLAYER_HP_LOSS_HUNGRY,
+                           0);
+    }
+
+    time_of_last_action = player->time;
+    if (player->hp > 0) {
+      player->choice_count = 0;
+      // Execute map actions (random encounter or such)
+      struct fal_location *location = find_location(
+          engine->locations, engine->location_count, player->location);
+      execute_actions(engine, location->actions, location->action_count);
+    }
+  }
+}
+
+static void start_new_game(struct fal_engine *engine) {
+  static const char POP_BOX_CONTENT[][80] = {"What is your name?"};
+  fal_console_ui_display_interface(
+      engine->console, FAL_UI_POSITION_POP_BOX, FAL_BORDER_SINGLE,
+      POP_BOX_CONTENT, sizeof(POP_BOX_CONTENT) / sizeof(POP_BOX_CONTENT[0]),
+      true);
+
+  char player_name[FAL_PLAYER_NAME_MAX_LENGTH];
+  fal_console_read_line(engine->console, player_name,
+                        FAL_PLAYER_NAME_MAX_LENGTH);
+  fal_player_init(&engine->player, player_name);
+  main_loop(engine);
+}
+
 void fal_engine_start(struct fal_engine *engine) {
   bool running = true;
   while (running) {
@@ -502,7 +807,7 @@ void fal_engine_start(struct fal_engine *engine) {
     if (key == FAL_KEY_ESCAPE || key == FAL_KEY_Q) {
       running = false;
     } else if (key == FAL_KEY_N) {
-      // new game
+      start_new_game(engine);
     } else if (key == FAL_KEY_L) {
       // load game
     } else if (key == FAL_KEY_M) {

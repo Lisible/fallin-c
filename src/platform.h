@@ -32,6 +32,7 @@ enum fal_key {
   FAL_KEY_COUNT,
   FAL_KEY_UNKNOWN,
 };
+enum fal_key fal_key_from_string(const char *key);
 
 enum fal_key fal_platform_read_key(void);
 

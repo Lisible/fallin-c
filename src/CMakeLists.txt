@@ -3,6 +3,7 @@ set(fallinc_srcs
   engine.c
   console.c
   jbb.c
+  str.c
 )
 
 if (WASM)
