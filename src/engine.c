@@ -2,6 +2,7 @@
 #include "engine.h"
 #include "jbb.h"
 #include "panic.h"
+#include "platform.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -493,7 +494,27 @@ static void display_main_menu(struct fal_engine *engine) {
       sizeof(MAIN_MENU_CONTENT) / sizeof(MAIN_MENU_CONTENT[0]), false);
 }
 
-void fal_engine_start(struct fal_engine *engine) { display_main_menu(engine); }
+void fal_engine_start(struct fal_engine *engine) {
+  bool running = true;
+  while (running) {
+    display_main_menu(engine);
+    enum fal_key key = fal_platform_read_key();
+    if (key == FAL_KEY_ESCAPE || key == FAL_KEY_Q) {
+      running = false;
+    } else if (key == FAL_KEY_N) {
+      // new game
+    } else if (key == FAL_KEY_L) {
+      // load game
+    } else if (key == FAL_KEY_M) {
+      // load module
+    } else if (key == FAL_KEY_A) {
+      fal_console_ui_display_notice_pop(engine->console,
+                                        " Software made by @lisible\\          "
+                                        "     ~~ @sliya\\              "
+                                        " ~~ @metzg");
+    }
+  }
+}
 
 void fal_engine_destroy(struct fal_engine *engine) {
   fal_console_destroy(engine->console);

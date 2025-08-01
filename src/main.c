@@ -22,7 +22,7 @@ int main(void) {
   //                        FAL_COLOR_RED, FAL_COLOR_RED);
   // fal_console_destroy(console);
 
-  while (fal_platform_read_key() != 27)
-    ;
+  // while (fal_platform_read_key() != FAL_KEY_ESCAPE)
+  //   ;
   return 0;
 }

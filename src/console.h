@@ -67,5 +67,7 @@ void fal_console_ui_display_interface(fal_console *console,
                                       enum fal_border_type border,
                                       const char content[][80],
                                       int content_size, bool input_line);
+void fal_console_ui_display_notice_pop(fal_console *console,
+                                       const char *content);
 
 #endif // FAL_CONSOLE_H
