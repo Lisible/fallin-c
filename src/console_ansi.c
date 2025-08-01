@@ -6,9 +6,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-#define FAL_CONSOLE_WIDTH 80
-#define FAL_CONSOLE_HEIGHT 25
-
 struct fal_console {
   enum fal_color background_color;
   enum fal_color text_color;
@@ -73,7 +70,7 @@ void fal_console_move(fal_console *console, int xrel, int yrel) {
   }
 }
 void fal_console_move_to(fal_console *console, int x, int y) {
-  printf("\033[%d;%dH", y, x);
+  printf("\033[%d;%dH", y + 1, x + 1);
 }
 
 void fal_console_clear(fal_console *console) {
@@ -87,7 +84,7 @@ void fal_console_clear(fal_console *console) {
   }
 }
 void fal_console_draw_frame(fal_console *console, int x1, int y1, int x2,
-                            int y2, enum fal_frame_border_type border_type,
+                            int y2, enum fal_border_type border_type,
                             enum fal_color background_color,
                             enum fal_color text_color) {
   if (x1 > x2 || y1 > y2) {
@@ -104,11 +101,11 @@ void fal_console_draw_frame(fal_console *console, int x1, int y1, int x2,
       char c = ' ';
       if ((x == x1 && y == y1) || (x == x2 && y == y1) ||
           (x == x1 && y == y2) || (x == x2 && y == y2)) {
-        c = border_type == FAL_FRAME_BORDER_SINGLE ? '+' : '#';
+        c = border_type == FAL_BORDER_SINGLE ? '+' : '#';
       } else if (x == x1 || x == x2) {
-        c = border_type == FAL_FRAME_BORDER_SINGLE ? '|' : '#';
+        c = border_type == FAL_BORDER_SINGLE ? '|' : '#';
       } else if (y == y1 || y == y2) {
-        c = border_type == FAL_FRAME_BORDER_SINGLE ? '-' : '=';
+        c = border_type == FAL_BORDER_SINGLE ? '-' : '=';
       }
 
       printf("%c", c);

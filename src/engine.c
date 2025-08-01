@@ -456,7 +456,7 @@ struct fal_engine *fal_engine_create(void) {
 
 static void display_main_menu(struct fal_engine *engine) {
   // clang-format off
-  static const char ILLUSTRATION[18][80] = {
+  static const char ILLUSTRATION[][80] = {
 "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
 "11111111111111111111111111111111111111111111111111111111111111111111111111111111",
 "11111100001111000111101111101111111111111111111111119999999999111110000000001111",
@@ -478,7 +478,19 @@ static void display_main_menu(struct fal_engine *engine) {
   };
   // clang-format on
 
-  fal_console_ui_display_illustration(engine->console, ILLUSTRATION, 18, 0);
+  fal_console_clear(engine->console);
+  fal_console_ui_display_illustration(
+      engine->console, ILLUSTRATION,
+      sizeof(ILLUSTRATION) / sizeof(ILLUSTRATION[0]), 0);
+
+  static const char MAIN_MENU_CONTENT[][80] = {
+      "[n] Start a new game", "[l] Load game", "[m] Load module", "[a] About",
+      "[q] Exit"};
+
+  fal_console_ui_display_interface(
+      engine->console, FAL_UI_POSITION_BOTTOM, FAL_BORDER_SINGLE,
+      MAIN_MENU_CONTENT,
+      sizeof(MAIN_MENU_CONTENT) / sizeof(MAIN_MENU_CONTENT[0]), false);
 }
 
 void fal_engine_start(struct fal_engine *engine) { display_main_menu(engine); }

@@ -1,6 +1,13 @@
 #ifndef FAL_CONSOLE_H
 #define FAL_CONSOLE_H
 
+#include <stdbool.h>
+
+#define FAL_CONSOLE_WIDTH 80
+#define FAL_CONSOLE_HEIGHT 25
+#define FAL_CONSOLE_TOP 0
+#define FAL_CONSOLE_LEFT 0
+
 enum fal_color {
   FAL_COLOR_BLACK = 30,
   FAL_COLOR_RED = 31,
@@ -31,20 +38,34 @@ void fal_console_set_background_color(fal_console *console,
 void fal_console_move(fal_console *console, int xrel, int yrel);
 void fal_console_move_to(fal_console *console, int x, int y);
 
-enum fal_frame_border_type {
-  FAL_FRAME_BORDER_SINGLE,
-  FAL_FRAME_BORDER_DOUBLE,
+enum fal_border_type {
+  FAL_BORDER_SINGLE,
+  FAL_BORDER_DOUBLE,
 };
 void fal_console_clear(fal_console *console);
 void fal_console_draw_frame(fal_console *console, int x1, int y1, int x2,
-                            int y2, enum fal_frame_border_type border_type,
+                            int y2, enum fal_border_type border_type,
                             enum fal_color background_color,
                             enum fal_color text_color);
 
 void fal_console_write_at(fal_console *console, int x, int y, const char *text);
 
+enum fal_ui_position {
+  FAL_UI_POSITION_HEADER,
+  FAL_UI_POSITION_LEFT_PANE,
+  FAL_UI_POSITION_RIGHT_PANE,
+  FAL_UI_POSITION_DESCRIPTION_BOX,
+  FAL_UI_POSITION_POP_BOX,
+  FAL_UI_POSITION_BOTTOM,
+};
+
 void fal_console_ui_display_illustration(fal_console *console,
                                          const char illustration[][80],
                                          int height, int offset);
+void fal_console_ui_display_interface(fal_console *console,
+                                      enum fal_ui_position position,
+                                      enum fal_border_type border,
+                                      const char content[][80],
+                                      int content_size, bool input_line);
 
 #endif // FAL_CONSOLE_H
